@@ -9,7 +9,7 @@ services:
     image: ollama/ollama:${OLLAMA_DOCKER_TAG-latest}
     environment:
       - NO_PROXY=${NO_PROXY},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
-      - NO_PROXY=${NO_PROXY},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
+      - no_proxy=${no_proxy},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
     networks:
       - open-webui
 
@@ -30,7 +30,7 @@ services:
       - OLLAMA_BASE_URL=http://ollama:11434
       - GITHUB_TOKEN=
       - NO_PROXY=${NO_PROXY},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
-      - NO_PROXY=${NO_PROXY},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
+      - no_proxy=${no_proxy},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
     #extra_hosts:
     #  - host.docker.internal:host-gateway
     #ports:
@@ -55,7 +55,7 @@ services:
       - OLLAMA_BASE_URL=http://ollama:11434
       - GITHUB_TOKEN=
       - NO_PROXY=${NO_PROXY},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
-      - NO_PROXY=${NO_PROXY},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
+      - no_proxy=${no_proxy},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
     #extra_hosts:
     #  - host.docker.internal:host-gateway
     #ports:
@@ -80,7 +80,7 @@ services:
       - OLLAMA_BASE_URL=http://ollama:11434
       - GITHUB_TOKEN=
       - NO_PROXY=${NO_PROXY},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
-      - NO_PROXY=${NO_PROXY},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
+      - no_proxy=${no_proxy},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
     #extra_hosts:
     #  - host.docker.internal:host-gateway
     #ports:
@@ -108,7 +108,7 @@ services:
       - 'OPENAI_API_BASE_URL=http://pipelines:9099'
       - 'OPENAI_API_KEY=0p3n-w3bu!'
       - NO_PROXY=${NO_PROXY},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
-      - NO_PROXY=${NO_PROXY},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
+      - no_proxy=${no_proxy},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
 
     #extra_hosts:
     #  - host.docker.internal:host-gateway
