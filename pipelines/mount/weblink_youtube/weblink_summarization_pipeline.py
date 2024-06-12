@@ -1,6 +1,7 @@
 from typing import List, Union, Generator, Iterator
 from schemas import OpenAIChatMessage
 from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api import NoTranscriptFound
 import requests, os
 
 from langchain.chains.summarize import load_summarize_chain
@@ -56,7 +57,13 @@ class Pipeline:
             )[0]
 
             # str_id = user_message.split("https://www.youtube.com/watch?v=")#iz_SJ5TpLJ0
-            transcript = YouTubeTranscriptApi.get_transcript(str_id)
+            try:
+                transcript = YouTubeTranscriptApi.get_transcript(str_id)
+            except NoTranscriptFound:
+                return (
+                    "Error: there is no transcript available for the video https://www.youtube.com/watch?v="
+                    + str_id
+                )
 
             full_text = ""
             for excerpt in transcript:
