@@ -32,7 +32,9 @@
 			saveSettings({ notificationEnabled: notificationEnabled });
 		} else {
 			toast.error(
-				'Response notifications cannot be activated as the website permissions have been denied. Please visit your browser settings to grant the necessary access.'
+				$i18n.t(
+					'Response notifications cannot be activated as the website permissions have been denied. Please visit your browser settings to grant the necessary access.'
+				)
 			);
 		}
 	};
@@ -55,6 +57,8 @@
 		stop: null,
 		tfs_z: null,
 		num_ctx: null,
+		num_batch: null,
+		num_keep: null,
 		max_tokens: null
 	};
 
@@ -140,6 +144,7 @@
 						<option value="dark">🌑 {$i18n.t('Dark')}</option>
 						<option value="oled-dark">🌃 {$i18n.t('OLED Dark')}</option>
 						<option value="light">☀️ {$i18n.t('Light')}</option>
+						<option value="her">🌷 Her</option>
 						<!-- <option value="rose-pine dark">🪻 {$i18n.t('Rosé Pine')}</option>
 						<option value="rose-pine-dawn light">🌷 {$i18n.t('Rosé Pine Dawn')}</option> -->
 					</select>
@@ -307,6 +312,8 @@
 						top_p: params.top_p !== null ? params.top_p : undefined,
 						tfs_z: params.tfs_z !== null ? params.tfs_z : undefined,
 						num_ctx: params.num_ctx !== null ? params.num_ctx : undefined,
+						num_batch: params.num_batch !== null ? params.num_batch : undefined,
+						num_keep: params.num_keep !== null ? params.num_keep : undefined,
 						max_tokens: params.max_tokens !== null ? params.max_tokens : undefined,
 						use_mmap: params.use_mmap !== null ? params.use_mmap : undefined,
 						use_mlock: params.use_mlock !== null ? params.use_mlock : undefined,

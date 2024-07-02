@@ -5,7 +5,7 @@
 
 	import { onMount, getContext } from 'svelte';
 	import { page } from '$app/stores';
-	import { settings, user, config, models } from '$lib/stores';
+	import { settings, user, config, models, tools, functions } from '$lib/stores';
 	import { splitStream } from '$lib/utils';
 
 	import { getModelInfos, updateModelById } from '$lib/apis/models';
@@ -15,6 +15,8 @@
 	import Checkbox from '$lib/components/common/Checkbox.svelte';
 	import Tags from '$lib/components/common/Tags.svelte';
 	import Knowledge from '$lib/components/workspace/Models/Knowledge.svelte';
+	import ToolsSelector from '$lib/components/workspace/Models/ToolsSelector.svelte';
+	import FiltersSelector from '$lib/components/workspace/Models/FiltersSelector.svelte';
 
 	const i18n = getContext('i18n');
 
@@ -60,6 +62,8 @@
 	};
 
 	let knowledge = [];
+	let toolIds = [];
+	let filterIds = [];
 
 	const updateHandler = async () => {
 		loading = true;
@@ -76,6 +80,22 @@
 			}
 		}
 
+		if (toolIds.length > 0) {
+			info.meta.toolIds = toolIds;
+		} else {
+			if (info.meta.toolIds) {
+				delete info.meta.toolIds;
+			}
+		}
+
+		if (filterIds.length > 0) {
+			info.meta.filterIds = filterIds;
+		} else {
+			if (info.meta.filterIds) {
+				delete info.meta.filterIds;
+			}
+		}
+
 		info.params.stop = params.stop ? params.stop.split(',').filter((s) => s.trim()) : null;
 		Object.keys(info.params).forEach((key) => {
 			if (info.params[key] === '' || info.params[key] === null) {
@@ -87,7 +107,7 @@
 
 		if (res) {
 			await models.set(await getModels(localStorage.token));
-			toast.success('Model updated successfully');
+			toast.success($i18n.t('Model updated successfully'));
 			await goto('/workspace/models');
 		}
 
@@ -133,6 +153,14 @@
 					knowledge = [...model?.info?.meta?.knowledge];
 				}
 
+				if (model?.info?.meta?.toolIds) {
+					toolIds = [...model?.info?.meta?.toolIds];
+				}
+
+				if (model?.info?.meta?.filterIds) {
+					filterIds = [...model?.info?.meta?.filterIds];
+				}
+
 				if (model?.owned_by === 'openai') {
 					capabilities.usage = false;
 				}
@@ -176,20 +204,20 @@
 					// Calculate the new width and height to fit within 100x100
 					let newWidth, newHeight;
 					if (aspectRatio > 1) {
-						newWidth = 100 * aspectRatio;
-						newHeight = 100;
+						newWidth = 250 * aspectRatio;
+						newHeight = 250;
 					} else {
-						newWidth = 100;
-						newHeight = 100 / aspectRatio;
+						newWidth = 250;
+						newHeight = 250 / aspectRatio;
 					}
 
 					// Set the canvas size
-					canvas.width = 100;
-					canvas.height = 100;
+					canvas.width = 250;
+					canvas.height = 250;
 
 					// Calculate the position to center the image
-					const offsetX = (100 - newWidth) / 2;
-					const offsetY = (100 - newHeight) / 2;
+					const offsetX = (250 - newWidth) / 2;
+					const offsetY = (250 - newHeight) / 2;
 
 					// Draw the image on the canvas
 					ctx.drawImage(img, offsetX, offsetY, newWidth, newHeight);
@@ -355,10 +383,11 @@
 				</div>
 
 				{#if info.meta.description !== null}
-					<input
+					<textarea
 						class="mt-1 px-3 py-1.5 text-sm w-full bg-transparent border dark:border-gray-600 outline-none rounded-lg"
 						placeholder={$i18n.t('Add a short description about what this model does')}
 						bind:value={info.meta.description}
+						row="3"
 					/>
 				{/if}
 			</div>
@@ -513,6 +542,17 @@
 
 			<div class="my-2">
 				<Knowledge bind:knowledge />
+			</div>
+
+			<div class="my-2">
+				<ToolsSelector bind:selectedToolIds={toolIds} tools={$tools} />
+			</div>
+
+			<div class="my-2">
+				<FiltersSelector
+					bind:selectedFilterIds={filterIds}
+					filters={$functions.filter((func) => func.type === 'filter')}
+				/>
 			</div>
 
 			<div class="my-2">

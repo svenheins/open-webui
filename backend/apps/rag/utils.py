@@ -236,39 +236,38 @@ def get_embedding_function(
         return lambda query: generate_multiple(query, func)
 
 
-def rag_messages(
-    docs,
+def get_rag_context(
+    files,
     messages,
-    template,
     embedding_function,
     k,
     reranking_function,
     r,
     hybrid_search,
 ):
-    log.debug(f"docs: {docs} {messages} {embedding_function} {reranking_function}")
+    log.debug(f"files: {files} {messages} {embedding_function} {reranking_function}")
     query = get_last_user_message(messages)
 
     extracted_collections = []
     relevant_contexts = []
 
-    for doc in docs:
+    for file in files:
         context = None
 
         collection_names = (
-            doc["collection_names"]
-            if doc["type"] == "collection"
-            else [doc["collection_name"]]
+            file["collection_names"]
+            if file["type"] == "collection"
+            else [file["collection_name"]]
         )
 
         collection_names = set(collection_names).difference(extracted_collections)
         if not collection_names:
-            log.debug(f"skipping {doc} as it has already been extracted")
+            log.debug(f"skipping {file} as it has already been extracted")
             continue
 
         try:
-            if doc["type"] == "text":
-                context = doc["content"]
+            if file["type"] == "text":
+                context = file["content"]
             else:
                 if hybrid_search:
                     context = query_collection_with_hybrid_search(
@@ -291,7 +290,7 @@ def rag_messages(
             context = None
 
         if context:
-            relevant_contexts.append({**context, "source": doc})
+            relevant_contexts.append({**context, "source": file})
 
         extracted_collections.extend(collection_names)
 
@@ -318,16 +317,7 @@ def rag_messages(
 
     context_string = context_string.strip()
 
-    ra_content = rag_template(
-        template=template,
-        context=context_string,
-        query=query,
-    )
-
-    log.debug(f"ra_content: {ra_content}")
-    messages = add_or_update_system_message(ra_content, messages)
-
-    return messages, citations
+    return context_string, citations
 
 
 def get_model_path(model: str, update_model: bool = False):

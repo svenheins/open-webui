@@ -1,10 +1,10 @@
 import json
 import logging
-
+from typing import List, Optional
 import requests
 from urllib.parse import urlencode
 
-from apps.rag.search.main import SearchResult
+from apps.rag.search.main import SearchResult, get_filtered_results
 from config import SRC_LOG_LEVELS
 
 log = logging.getLogger(__name__)
@@ -12,14 +12,15 @@ log.setLevel(SRC_LOG_LEVELS["RAG"])
 
 
 def search_serply(
-        api_key: str,
-        query: str,
-        count: int,
-        hl: str = "us",
-        limit: int = 10,
-        device_type: str = "desktop",
-        proxy_location: str = "US"
-    ) -> list[SearchResult]:
+    api_key: str,
+    query: str,
+    count: int,
+    hl: str = "us",
+    limit: int = 10,
+    device_type: str = "desktop",
+    proxy_location: str = "US",
+    filter_list: Optional[List[str]] = None,
+) -> list[SearchResult]:
     """Search using serper.dev's API and return the results as a list of SearchResult objects.
 
     Args:
@@ -37,7 +38,7 @@ def search_serply(
         "language": "en",
         "num": limit,
         "gl": proxy_location.upper(),
-        "hl": hl.lower()
+        "hl": hl.lower(),
     }
 
     url = f"{url}{urlencode(query_payload)}"
@@ -45,7 +46,7 @@ def search_serply(
         "X-API-KEY": api_key,
         "X-User-Agent": device_type,
         "User-Agent": "open-webui",
-        "X-Proxy-Location": proxy_location
+        "X-Proxy-Location": proxy_location,
     }
 
     response = requests.request("GET", url, headers=headers)
@@ -57,7 +58,8 @@ def search_serply(
     results = sorted(
         json_response.get("results", []), key=lambda x: x.get("realPosition", 0)
     )
-
+    if filter_list:
+        results = get_filtered_results(results, filter_list)
     return [
         SearchResult(
             link=result["link"],

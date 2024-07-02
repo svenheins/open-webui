@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { DropdownMenu } from 'bits-ui';
+	import { marked } from 'marked';
 
 	import { flyAndScale } from '$lib/utils/transitions';
 	import { createEventDispatcher, onMount, getContext, tick } from 'svelte';
@@ -152,6 +153,7 @@
 
 					toast.error(error);
 					// opts.callback({ success: false, error, modelName: opts.modelName });
+					break;
 				}
 			}
 
@@ -202,6 +204,7 @@
 		searchValue = '';
 		window.setTimeout(() => document.getElementById('model-search-input')?.focus(), 0);
 	}}
+	closeFocus={false}
 >
 	<DropdownMenu.Trigger class="relative w-full" aria-label={placeholder}>
 		<div
@@ -332,9 +335,12 @@
 
 								{#if item.model?.info?.meta?.description}
 									<Tooltip
-										content={`${sanitizeResponseContent(
-											item.model?.info?.meta?.description
-										).replaceAll('\n', '<br>')}`}
+										content={`${marked.parse(
+											sanitizeResponseContent(item.model?.info?.meta?.description).replaceAll(
+												'\n',
+												'<br>'
+											)
+										)}`}
 									>
 										<div class="">
 											<svg
