@@ -8,8 +8,8 @@ services:
     restart: unless-stopped
     image: ollama/ollama:${OLLAMA_DOCKER_TAG-latest}
     environment:
-      - NO_PROXY=${NO_PROXY},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
-      - no_proxy=${no_proxy},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
+      - NO_PROXY=${NO_PROXY},ollama,pipelines-base,pipelines-crewai,pipelines-neo4j-agents,pipelines-weblink-youtube,open-webui
+      - no_proxy=${no_proxy},ollama,pipelines-base,pipelines-crewai,pipelines-neo4j-agents,pipelines-weblink-youtube,open-webui
     networks:
       - open-webui
 
@@ -29,8 +29,8 @@ services:
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
       - GITHUB_TOKEN=
-      - NO_PROXY=${NO_PROXY},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
-      - no_proxy=${no_proxy},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
+      - NO_PROXY=${NO_PROXY},ollama,pipelines-base,pipelines-crewai,pipelines-neo4j-agents,pipelines-weblink-youtube,open-webui
+      - no_proxy=${no_proxy},ollama,pipelines-base,pipelines-crewai,pipelines-neo4j-agents,pipelines-weblink-youtube,open-webui
     #extra_hosts:
     #  - host.docker.internal:host-gateway
     #ports:
@@ -54,8 +54,33 @@ services:
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
       - GITHUB_TOKEN=
-      - NO_PROXY=${NO_PROXY},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
-      - no_proxy=${no_proxy},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
+      - NO_PROXY=${NO_PROXY},ollama,pipelines-base,pipelines-crewai,pipelines-neo4j-agents,pipelines-weblink-youtube,open-webui
+      - no_proxy=${no_proxy},ollama,pipelines-base,pipelines-crewai,pipelines-neo4j-agents,pipelines-weblink-youtube,open-webui
+    #extra_hosts:
+    #  - host.docker.internal:host-gateway
+    #ports:
+    #  - 9098:9099
+    networks:
+      - open-webui
+
+  pipelines-neo4j-agents:
+    build:
+      context: pipelines
+      dockerfile: Dockerfile_neo4j_agents
+    volumes:
+      - ./pipelines/mount/neo4j_agents:/app/pipelines 
+      - ./pipelines/mount/.env:/app/pipelines/.env
+    depends_on:
+      - ollama
+    container_name: pipelines-neo4j-agents
+    tty: true
+    restart: unless-stopped
+    #image: ghcr.io/open-webui/pipelines:main
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - GITHUB_TOKEN=
+      - NO_PROXY=${NO_PROXY},ollama,pipelines-base,pipelines-crewai,pipelines-neo4j-agents,pipelines-weblink-youtube,open-webui
+      - no_proxy=${no_proxy},ollama,pipelines-base,pipelines-crewai,pipelines-neo4j-agents,pipelines-weblink-youtube,open-webui
     #extra_hosts:
     #  - host.docker.internal:host-gateway
     #ports:
@@ -79,8 +104,8 @@ services:
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
       - GITHUB_TOKEN=
-      - NO_PROXY=${NO_PROXY},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
-      - no_proxy=${no_proxy},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
+      - NO_PROXY=${NO_PROXY},ollama,pipelines-base,pipelines-crewai,pipelines-neo4j-agents,pipelines-weblink-youtube,open-webui
+      - no_proxy=${no_proxy},ollama,pipelines-base,pipelines-crewai,pipelines-neo4j-agents,pipelines-weblink-youtube,open-webui
     #extra_hosts:
     #  - host.docker.internal:host-gateway
     #ports:
@@ -107,8 +132,8 @@ services:
       - 'WEBUI_SECRET_KEY='
       - 'OPENAI_API_BASE_URL=http://pipelines:9099'
       - 'OPENAI_API_KEY=0p3n-w3bu!'
-      - NO_PROXY=${NO_PROXY},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
-      - no_proxy=${no_proxy},ollama,pipelines-base,pipelines-crewai,pipelines-weblink-youtube,open-webui
+      - NO_PROXY=${NO_PROXY},ollama,pipelines-base,pipelines-crewai,pipelines-neo4j-agents,pipelines-weblink-youtube,open-webui
+      - no_proxy=${no_proxy},ollama,pipelines-base,pipelines-crewai,pipelines-neo4j-agents,pipelines-weblink-youtube,open-webui
 
     #extra_hosts:
     #  - host.docker.internal:host-gateway
