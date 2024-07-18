@@ -1,3 +1,6 @@
 [submodule "pipelines"]
 	path = pipelines
 	url = git@github.com:svenheins/pipelines.git
+[submodule "graph-module"]
+	path = graph-module
+	url = git@github.com:svenheins/graph-module.git
