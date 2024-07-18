@@ -71,7 +71,10 @@ services:
       - ./pipelines/mount/neo4j_agents:/app/pipelines 
       - ./pipelines/mount/.env:/app/pipelines/.env
     depends_on:
-      - ollama
+      ollama:
+        condition: service_started
+      neo4j:
+        condition: service_healthy
     container_name: pipelines-neo4j-agents
     tty: true
     restart: unless-stopped
@@ -140,6 +143,29 @@ services:
     restart: unless-stopped
     networks:
       - open-webui
+
+  neo4j:
+    image: neo4j:5.20.0-community-bullseye
+    container_name: neo4j
+    environment:
+      - NEO4J_AUTH=neo4j/test1234
+    ports:
+      - 7474:7474
+      - 7687:7687
+    healthcheck:
+      test: wget http://localhost:7474 || exit 1
+      interval: 1s
+      timeout: 10s
+      retries: 20
+      start_period: 3s
+    volumes:
+      - ./graph-module/neo4j/data:/data
+      - ./graph-module/neo4j/logs:/logs
+      - ./graph-module/neo4j/import:/var/lib/neo4j/import
+      - ./graph-module/neo4j/plugins:/plugins
+    networks:
+      - open-webui
+
 
 volumes:
   ollama: {}
