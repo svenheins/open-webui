@@ -33,8 +33,8 @@ services:
       - no_proxy=${no_proxy},ollama,pipelines-base,pipelines-crewai,pipelines-neo4j-agents,pipelines-weblink-youtube,open-webui
     #extra_hosts:
     #  - host.docker.internal:host-gateway
-    #ports:
-    #  - 9099:9099
+    ports:
+      - 11435:11434
     networks:
       - open-webui
 
