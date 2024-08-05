@@ -161,7 +161,7 @@ if [[ $kill_compose == true ]]; then
     echo -e "${GREEN}${BOLD}Compose project dropped successfully.${NC}"
     exit
 else
-    DEFAULT_COMPOSE_COMMAND="${docker_compose} -f docker-compose.pipelines.yaml"
+    DEFAULT_COMPOSE_COMMAND="export $(cat .env) && ${docker_compose} -f docker-compose.pipelines.yaml"
     if [[ $enable_gpu == true ]]; then
         # Validate and process command-line arguments
         if [[ -n $gpu_count ]]; then
