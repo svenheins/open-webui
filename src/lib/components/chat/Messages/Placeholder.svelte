@@ -2,7 +2,7 @@
 	import { WEBUI_BASE_URL } from '$lib/constants';
 	import { marked } from 'marked';
 
-	import { config, user, models as _models } from '$lib/stores';
+	import { config, user, models as _models, temporaryChatEnabled } from '$lib/stores';
 	import { onMount, getContext } from 'svelte';
 
 	import { blur, fade } from 'svelte/transition';
@@ -10,6 +10,7 @@
 	import Suggestions from '../MessageInput/Suggestions.svelte';
 	import { sanitizeResponseContent } from '$lib/utils';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
+	import EyeSlash from '$lib/components/icons/EyeSlash.svelte';
 
 	const i18n = getContext('i18n');
 
@@ -33,9 +34,9 @@
 </script>
 
 {#key mounted}
-	<div class="m-auto w-full max-w-6xl px-8 lg:px-20 pb-10">
+	<div class="m-auto w-full max-w-6xl px-8 lg:px-20">
 		<div class="flex justify-start">
-			<div class="flex -space-x-4 mb-1" in:fade={{ duration: 200 }}>
+			<div class="flex -space-x-4 mb-0.5" in:fade={{ duration: 200 }}>
 				{#each models as model, modelIdx}
 					<button
 						on:click={() => {
@@ -64,8 +65,20 @@
 			</div>
 		</div>
 
+		{#if $temporaryChatEnabled}
+			<Tooltip
+				content="This chat won't appear in history and your messages will not be saved."
+				className="w-fit"
+				placement="top-start"
+			>
+				<div class="flex items-center gap-2 text-gray-500 font-medium text-lg my-2 w-fit">
+					<EyeSlash strokeWidth="2.5" className="size-5" /> Temporary Chat
+				</div>
+			</Tooltip>
+		{/if}
+
 		<div
-			class=" mt-2 mb-4 text-3xl text-gray-800 dark:text-gray-100 font-semibold text-left flex items-center gap-4 font-primary"
+			class=" mt-2 mb-4 text-3xl text-gray-800 dark:text-gray-100 font-medium text-left flex items-center gap-4 font-primary"
 		>
 			<div>
 				<div class=" capitalize line-clamp-1" in:fade={{ duration: 200 }}>
@@ -113,7 +126,8 @@
 		<div class=" w-full font-primary" in:fade={{ duration: 200, delay: 300 }}>
 			<Suggestions
 				suggestionPrompts={models[selectedModelIdx]?.info?.meta?.suggestion_prompts ??
-					$config.default_prompt_suggestions}
+					$config?.default_prompt_suggestions ??
+					[]}
 				{submitPrompt}
 			/>
 		</div>
