@@ -13,11 +13,13 @@
 	import { synthesizeOpenAISpeech } from '$lib/apis/audio';
 	import { imageGenerations } from '$lib/apis/images';
 	import {
+		copyToClipboard as _copyToClipboard,
 		approximateToHumanReadable,
 		extractParagraphsForAudio,
 		extractSentencesForAudio,
 		cleanText,
-		getMessageContentParts
+		getMessageContentParts,
+		sanitizeResponseContent
 	} from '$lib/utils';
 	import { WEBUI_BASE_URL } from '$lib/constants';
 
@@ -36,6 +38,7 @@
 
 	import type { Writable } from 'svelte/store';
 	import type { i18n as i18nType } from 'i18next';
+	import ContentRenderer from './ContentRenderer.svelte';
 
 	interface MessageType {
 		id: string;
@@ -72,26 +75,34 @@
 			prompt_eval_duration?: number;
 			total_duration?: number;
 			load_duration?: number;
+			usage?: unknown;
 		};
 		annotation?: { type: string; rating: number };
 	}
 
-	export let message: MessageType;
+	export let history;
+	export let messageId;
+
+	let message: MessageType = JSON.parse(JSON.stringify(history.messages[messageId]));
+	$: if (history.messages) {
+		if (JSON.stringify(message) !== JSON.stringify(history.messages[messageId])) {
+			message = JSON.parse(JSON.stringify(history.messages[messageId]));
+		}
+	}
+
 	export let siblings;
 
-	export let isLastMessage = true;
-
-	export let readOnly = false;
-
-	export let updateChatMessages: Function;
-	export let confirmEditResponseMessage: Function;
 	export let showPreviousMessage: Function;
 	export let showNextMessage: Function;
+
+	export let editMessage: Function;
 	export let rateMessage: Function;
 
-	export let copyToClipboard: Function;
-	export let continueGeneration: Function;
+	export let continueResponse: Function;
 	export let regenerateResponse: Function;
+
+	export let isLastMessage = true;
+	export let readOnly = false;
 
 	let model = null;
 	$: model = $models.find((m) => m.id === message.model);
@@ -108,6 +119,13 @@
 	let generatingImage = false;
 
 	let showRateComment = false;
+
+	const copyToClipboard = async (text) => {
+		const res = await _copyToClipboard(text);
+		if (res) {
+			toast.success($i18n.t('Copying to clipboard was successful!'));
+		}
+	};
 
 	const playAudio = (idx: number) => {
 		return new Promise<void>((res) => {
@@ -202,6 +220,8 @@
 					const blob = await res.blob();
 					const blobUrl = URL.createObjectURL(blob);
 					const audio = new Audio(blobUrl);
+					audio.playbackRate = $settings.audio?.tts?.playbackRate ?? 1;
+
 					audioParts[idx] = audio;
 					loadingSpeech = false;
 					lastPlayedAudioPromise = lastPlayedAudioPromise.then(() => playAudio(idx));
@@ -224,6 +244,7 @@
 					console.log(voice);
 
 					const speak = new SpeechSynthesisUtterance(message.content);
+					speak.rate = $settings.audio?.tts?.playbackRate ?? 1;
 
 					console.log(speak);
 
@@ -255,11 +276,16 @@
 	};
 
 	const editMessageConfirmHandler = async () => {
-		if (editedContent === '') {
-			editedContent = ' ';
-		}
+		editMessage(message.id, editedContent ? editedContent : '', false);
 
-		confirmEditResponseMessage(message.id, editedContent);
+		edit = false;
+		editedContent = '';
+
+		await tick();
+	};
+
+	const saveAsCopyHandler = async () => {
+		editMessage(message.id, editedContent ? editedContent : '');
 
 		edit = false;
 		editedContent = '';
@@ -281,12 +307,12 @@
 		console.log(res);
 
 		if (res) {
-			message.files = res.map((image) => ({
+			const files = res.map((image) => ({
 				type: 'image',
 				url: `${image.url}`
 			}));
 
-			dispatch('save', message);
+			dispatch('save', { ...message, files: files });
 		}
 
 		generatingImage = false;
@@ -299,6 +325,8 @@
 	}
 
 	onMount(async () => {
+		console.log('ResponseMessage mounted');
+
 		await tick();
 	});
 </script>
@@ -314,7 +342,7 @@
 				($i18n.language === 'dg-DG' ? `/doge.png` : `${WEBUI_BASE_URL}/static/favicon.png`)}
 		/>
 
-		<div class="w-full overflow-hidden pl-1">
+		<div class="flex-auto w-0 pl-1">
 			<Name>
 				{model?.name ?? message.model}
 
@@ -333,7 +361,7 @@
 						{#each message.files as file}
 							<div>
 								{#if file.type === 'image'}
-									<Image src={file.url} />
+									<Image src={file.url} alt={message.content} />
 								{/if}
 							</div>
 						{/each}
@@ -399,41 +427,86 @@
 										const isEnterPressed = e.key === 'Enter';
 
 										if (isCmdOrCtrlPressed && isEnterPressed) {
-											document.getElementById('save-edit-message-button')?.click();
+											document.getElementById('confirm-edit-message-button')?.click();
 										}
 									}}
 								/>
 
-								<div class=" mt-2 mb-1 flex justify-end space-x-1.5 text-sm font-medium">
-									<button
-										id="close-edit-message-button"
-										class="px-4 py-2 bg-white hover:bg-gray-100 text-gray-800 transition rounded-3xl"
-										on:click={() => {
-											cancelEditMessage();
-										}}
-									>
-										{$i18n.t('Cancel')}
-									</button>
+								<div class=" mt-2 mb-1 flex justify-between text-sm font-medium">
+									<div>
+										<button
+											id="save-new-message-button"
+											class=" px-4 py-2 bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 border dark:border-gray-700 text-gray-700 dark:text-gray-200 transition rounded-3xl"
+											on:click={() => {
+												saveAsCopyHandler();
+											}}
+										>
+											{$i18n.t('Save As Copy')}
+										</button>
+									</div>
 
-									<button
-										id="save-edit-message-button"
-										class=" px-4 py-2 bg-gray-900 hover:bg-gray-850 text-gray-100 transition rounded-3xl"
-										on:click={() => {
-											editMessageConfirmHandler();
-										}}
-									>
-										{$i18n.t('Save')}
-									</button>
+									<div class="flex space-x-1.5">
+										<button
+											id="close-edit-message-button"
+											class="px-4 py-2 bg-white dark:bg-gray-900 hover:bg-gray-100 text-gray-800 dark:text-gray-100 transition rounded-3xl"
+											on:click={() => {
+												cancelEditMessage();
+											}}
+										>
+											{$i18n.t('Cancel')}
+										</button>
+
+										<button
+											id="confirm-edit-message-button"
+											class=" px-4 py-2 bg-gray-900 dark:bg-white hover:bg-gray-850 text-gray-100 dark:text-gray-800 transition rounded-3xl"
+											on:click={() => {
+												editMessageConfirmHandler();
+											}}
+										>
+											{$i18n.t('Save')}
+										</button>
+									</div>
 								</div>
 							</div>
 						{:else}
-							<div class="w-full flex flex-col">
+							<div class="w-full flex flex-col relative" id="response-content-container">
 								{#if message.content === '' && !message.error}
 									<Skeleton />
 								{:else if message.content && message.error !== true}
 									<!-- always show message contents even if there's an error -->
 									<!-- unless message.error === true which is legacy error handling, where the error message is stored in message.content -->
-									<Markdown id={message.id} content={message.content} {model} />
+									<ContentRenderer
+										id={message.id}
+										content={message.content}
+										floatingButtons={message?.done}
+										save={true}
+										{model}
+										on:update={(e) => {
+											const { raw, oldContent, newContent } = e.detail;
+
+											history.messages[message.id].content = history.messages[
+												message.id
+											].content.replace(raw, raw.replace(oldContent, newContent));
+
+											dispatch('update');
+										}}
+										on:select={(e) => {
+											const { type, content } = e.detail;
+
+											if (type === 'explain') {
+												dispatch('submit', {
+													parentId: message.id,
+													prompt: `Explain this section to me in more detail\n\n\`\`\`\n${content}\n\`\`\``
+												});
+											} else if (type === 'ask') {
+												const input = e.detail?.input ?? '';
+												dispatch('submit', {
+													parentId: message.id,
+													prompt: `\`\`\`\n${content}\n\`\`\`\n${input}`
+												});
+											}
+										}}
+									/>
 								{/if}
 
 								{#if message.error}
@@ -582,30 +655,32 @@
 												fill="currentColor"
 												viewBox="0 0 24 24"
 												xmlns="http://www.w3.org/2000/svg"
-												><style>
+											>
+												<style>
 													.spinner_S1WN {
 														animation: spinner_MGfb 0.8s linear infinite;
 														animation-delay: -0.8s;
 													}
+
 													.spinner_Km9P {
 														animation-delay: -0.65s;
 													}
+
 													.spinner_JApP {
 														animation-delay: -0.5s;
 													}
+
 													@keyframes spinner_MGfb {
 														93.75%,
 														100% {
 															opacity: 0.2;
 														}
 													}
-												</style><circle class="spinner_S1WN" cx="4" cy="12" r="3" /><circle
-													class="spinner_S1WN spinner_Km9P"
-													cx="12"
-													cy="12"
-													r="3"
-												/><circle class="spinner_S1WN spinner_JApP" cx="20" cy="12" r="3" /></svg
-											>
+												</style>
+												<circle class="spinner_S1WN" cx="4" cy="12" r="3" />
+												<circle class="spinner_S1WN spinner_Km9P" cx="12" cy="12" r="3" />
+												<circle class="spinner_S1WN spinner_JApP" cx="20" cy="12" r="3" />
+											</svg>
 										{:else if speaking}
 											<svg
 												xmlns="http://www.w3.org/2000/svg"
@@ -658,30 +733,32 @@
 													fill="currentColor"
 													viewBox="0 0 24 24"
 													xmlns="http://www.w3.org/2000/svg"
-													><style>
+												>
+													<style>
 														.spinner_S1WN {
 															animation: spinner_MGfb 0.8s linear infinite;
 															animation-delay: -0.8s;
 														}
+
 														.spinner_Km9P {
 															animation-delay: -0.65s;
 														}
+
 														.spinner_JApP {
 															animation-delay: -0.5s;
 														}
+
 														@keyframes spinner_MGfb {
 															93.75%,
 															100% {
 																opacity: 0.2;
 															}
 														}
-													</style><circle class="spinner_S1WN" cx="4" cy="12" r="3" /><circle
-														class="spinner_S1WN spinner_Km9P"
-														cx="12"
-														cy="12"
-														r="3"
-													/><circle class="spinner_S1WN spinner_JApP" cx="20" cy="12" r="3" /></svg
-												>
+													</style>
+													<circle class="spinner_S1WN" cx="4" cy="12" r="3" />
+													<circle class="spinner_S1WN spinner_Km9P" cx="12" cy="12" r="3" />
+													<circle class="spinner_S1WN spinner_JApP" cx="20" cy="12" r="3" />
+												</svg>
 											{:else}
 												<svg
 													xmlns="http://www.w3.org/2000/svg"
@@ -705,7 +782,17 @@
 								{#if message.info}
 									<Tooltip
 										content={message.info.openai
-											? `prompt_tokens: ${message.info.prompt_tokens ?? 'N/A'}<br/>
+											? message.info.usage
+												? `<pre>${sanitizeResponseContent(
+														JSON.stringify(message.info.usage, null, 2)
+															.replace(/"([^(")"]+)":/g, '$1:')
+															.slice(1, -1)
+															.split('\n')
+															.map((line) => line.slice(2))
+															.map((line) => (line.endsWith(',') ? line.slice(0, -1) : line))
+															.join('\n')
+													)}</pre>`
+												: `prompt_tokens: ${message.info.prompt_tokens ?? 'N/A'}<br/>
 													completion_tokens: ${message.info.completion_tokens ?? 'N/A'}<br/>
 													total_tokens: ${message.info.total_tokens ?? 'N/A'}`
 											: `response_token/s: ${
@@ -815,10 +902,11 @@
 													stroke-linejoin="round"
 													class="w-4 h-4"
 													xmlns="http://www.w3.org/2000/svg"
-													><path
-														d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"
-													/></svg
 												>
+													<path
+														d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"
+													/>
+												</svg>
 											</button>
 										</Tooltip>
 
@@ -864,10 +952,11 @@
 													stroke-linejoin="round"
 													class="w-4 h-4"
 													xmlns="http://www.w3.org/2000/svg"
-													><path
-														d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"
-													/></svg
 												>
+													<path
+														d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"
+													/>
+												</svg>
 											</button>
 										</Tooltip>
 									{/if}
@@ -881,7 +970,7 @@
 													? 'visible'
 													: 'invisible group-hover:visible'} p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg dark:hover:text-white hover:text-black transition regenerate-response-button"
 												on:click={() => {
-													continueGeneration();
+													continueResponse();
 
 													(model?.actions ?? [])
 														.filter((action) => action?.__webui__ ?? false)
@@ -996,12 +1085,17 @@
 
 					{#if message.done && showRateComment}
 						<RateComment
-							messageId={message.id}
-							bind:show={showRateComment}
 							bind:message
+							bind:show={showRateComment}
 							on:submit={(e) => {
-								updateChatMessages();
-
+								dispatch('save', {
+									...message,
+									annotation: {
+										...message.annotation,
+										comment: e.detail.comment,
+										reason: e.detail.reason
+									}
+								});
 								(model?.actions ?? [])
 									.filter((action) => action?.__webui__ ?? false)
 									.forEach((action) => {
@@ -1035,6 +1129,7 @@
 		-ms-overflow-style: none; /* IE and Edge */
 		scrollbar-width: none; /* Firefox */
 	}
+
 	@keyframes shimmer {
 		0% {
 			background-position: 200% 0;

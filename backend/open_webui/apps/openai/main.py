@@ -9,7 +9,6 @@ import aiohttp
 import requests
 from open_webui.apps.webui.models.models import Models
 from open_webui.config import (
-    AIOHTTP_CLIENT_TIMEOUT,
     CACHE_DIR,
     CORS_ALLOW_ORIGIN,
     ENABLE_MODEL_FILTER,
@@ -19,6 +18,8 @@ from open_webui.config import (
     OPENAI_API_KEYS,
     AppConfig,
 )
+from open_webui.env import AIOHTTP_CLIENT_TIMEOUT
+
 from open_webui.constants import ERROR_MESSAGES
 from open_webui.env import SRC_LOG_LEVELS
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -26,7 +27,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from starlette.background import BackgroundTask
-
 
 from open_webui.utils.payload import (
     apply_model_params_to_body_openai,
@@ -46,7 +46,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 app.state.config = AppConfig()
 
@@ -180,7 +179,7 @@ async def speech(request: Request, user=Depends(get_verified_user)):
 
 
 async def fetch_url(url, key):
-    timeout = aiohttp.ClientTimeout(total=5)
+    timeout = aiohttp.ClientTimeout(total=3)
     try:
         headers = {"Authorization": f"Bearer {key}"}
         async with aiohttp.ClientSession(timeout=timeout, trust_env=True) as session:
@@ -405,13 +404,31 @@ async def generate_chat_completion(
             "role": user.role,
         }
 
+    url = app.state.config.OPENAI_API_BASE_URLS[idx]
+    key = app.state.config.OPENAI_API_KEYS[idx]
+    is_o1 = payload["model"].lower().startswith("o1-")
+
+    # Change max_completion_tokens to max_tokens (Backward compatible)
+    if "api.openai.com" not in url and not is_o1:
+        if "max_completion_tokens" in payload:
+            # Remove "max_completion_tokens" from the payload
+            payload["max_tokens"] = payload["max_completion_tokens"]
+            del payload["max_completion_tokens"]
+    else:
+        if is_o1 and "max_tokens" in payload:
+            payload["max_completion_tokens"] = payload["max_tokens"]
+            del payload["max_tokens"]
+        if "max_tokens" in payload and "max_completion_tokens" in payload:
+            del payload["max_tokens"]
+
+    # Fix: O1 does not support the "system" parameter, Modify "system" to "user"
+    if is_o1 and payload["messages"][0]["role"] == "system":
+        payload["messages"][0]["role"] = "user"
+
     # Convert the modified body back to JSON
     payload = json.dumps(payload)
 
     log.debug(payload)
-
-    url = app.state.config.OPENAI_API_BASE_URLS[idx]
-    key = app.state.config.OPENAI_API_KEYS[idx]
 
     headers = {}
     headers["Authorization"] = f"Bearer {key}"
@@ -423,6 +440,7 @@ async def generate_chat_completion(
     r = None
     session = None
     streaming = False
+    response = None
 
     try:
         session = aiohttp.ClientSession(
@@ -434,8 +452,6 @@ async def generate_chat_completion(
             data=payload,
             headers=headers,
         )
-
-        r.raise_for_status()
 
         # Check if response is SSE
         if "text/event-stream" in r.headers.get("Content-Type", ""):
@@ -449,19 +465,23 @@ async def generate_chat_completion(
                 ),
             )
         else:
-            response_data = await r.json()
-            return response_data
+            try:
+                response = await r.json()
+            except Exception as e:
+                log.error(e)
+                response = await r.text()
+
+            r.raise_for_status()
+            return response
     except Exception as e:
         log.exception(e)
         error_detail = "Open WebUI: Server Connection Error"
-        if r is not None:
-            try:
-                res = await r.json()
-                print(res)
-                if "error" in res:
-                    error_detail = f"External: {res['error']['message'] if 'message' in res['error'] else res['error']}"
-            except Exception:
-                error_detail = f"External: {e}"
+        if isinstance(response, dict):
+            if "error" in response:
+                error_detail = f"{response['error']['message'] if 'message' in response['error'] else response['error']}"
+        elif isinstance(response, str):
+            error_detail = response
+
         raise HTTPException(status_code=r.status if r else 500, detail=error_detail)
     finally:
         if not streaming and session:

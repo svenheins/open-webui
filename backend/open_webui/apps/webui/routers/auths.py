@@ -27,6 +27,7 @@ from open_webui.utils.utils import (
     create_api_key,
     create_token,
     get_admin_user,
+    get_verified_user,
     get_current_user,
     get_password_hash,
 )
@@ -71,7 +72,7 @@ async def get_session_user(
 
 @router.post("/update/profile", response_model=UserResponse)
 async def update_profile(
-    form_data: UpdateProfileForm, session_user=Depends(get_current_user)
+    form_data: UpdateProfileForm, session_user=Depends(get_verified_user)
 ):
     if session_user:
         user = Users.update_user_by_id(
@@ -188,14 +189,19 @@ async def signin(request: Request, response: Response, form_data: SigninForm):
 
 @router.post("/signup", response_model=SigninResponse)
 async def signup(request: Request, response: Response, form_data: SignupForm):
-    if (
-        not request.app.state.config.ENABLE_SIGNUP
-        and request.app.state.config.ENABLE_LOGIN_FORM
-        and WEBUI_AUTH
-    ):
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.ACCESS_PROHIBITED
-        )
+    if WEBUI_AUTH:
+        if (
+            not request.app.state.config.ENABLE_SIGNUP
+            or not request.app.state.config.ENABLE_LOGIN_FORM
+        ):
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.ACCESS_PROHIBITED
+            )
+    else:
+        if Users.get_num_users() != 0:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.ACCESS_PROHIBITED
+            )
 
     if not validate_email_format(form_data.email.lower()):
         raise HTTPException(

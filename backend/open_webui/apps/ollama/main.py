@@ -12,7 +12,6 @@ import aiohttp
 import requests
 from open_webui.apps.webui.models.models import Models
 from open_webui.config import (
-    AIOHTTP_CLIENT_TIMEOUT,
     CORS_ALLOW_ORIGIN,
     ENABLE_MODEL_FILTER,
     ENABLE_OLLAMA_API,
@@ -21,6 +20,9 @@ from open_webui.config import (
     UPLOAD_DIR,
     AppConfig,
 )
+from open_webui.env import AIOHTTP_CLIENT_TIMEOUT
+
+
 from open_webui.constants import ERROR_MESSAGES
 from open_webui.env import SRC_LOG_LEVELS
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
@@ -117,7 +119,7 @@ async def update_ollama_api_url(form_data: UrlUpdateForm, user=Depends(get_admin
 
 
 async def fetch_url(url):
-    timeout = aiohttp.ClientTimeout(total=5)
+    timeout = aiohttp.ClientTimeout(total=3)
     try:
         async with aiohttp.ClientSession(timeout=timeout, trust_env=True) as session:
             async with session.get(url) as response:
@@ -543,8 +545,65 @@ class GenerateEmbeddingsForm(BaseModel):
     keep_alive: Optional[Union[int, str]] = None
 
 
+class GenerateEmbedForm(BaseModel):
+    model: str
+    input: str
+    truncate: Optional[bool]
+    options: Optional[dict] = None
+    keep_alive: Optional[Union[int, str]] = None
+
+
 @app.post("/api/embed")
 @app.post("/api/embed/{url_idx}")
+async def generate_embeddings(
+    form_data: GenerateEmbedForm,
+    url_idx: Optional[int] = None,
+    user=Depends(get_verified_user),
+):
+    if url_idx is None:
+        model = form_data.model
+
+        if ":" not in model:
+            model = f"{model}:latest"
+
+        if model in app.state.MODELS:
+            url_idx = random.choice(app.state.MODELS[model]["urls"])
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=ERROR_MESSAGES.MODEL_NOT_FOUND(form_data.model),
+            )
+
+    url = app.state.config.OLLAMA_BASE_URLS[url_idx]
+    log.info(f"url: {url}")
+
+    r = requests.request(
+        method="POST",
+        url=f"{url}/api/embed",
+        headers={"Content-Type": "application/json"},
+        data=form_data.model_dump_json(exclude_none=True).encode(),
+    )
+    try:
+        r.raise_for_status()
+
+        return r.json()
+    except Exception as e:
+        log.exception(e)
+        error_detail = "Open WebUI: Server Connection Error"
+        if r is not None:
+            try:
+                res = r.json()
+                if "error" in res:
+                    error_detail = f"Ollama: {res['error']}"
+            except Exception:
+                error_detail = f"Ollama: {e}"
+
+        raise HTTPException(
+            status_code=r.status_code if r else 500,
+            detail=error_detail,
+        )
+
+
 @app.post("/api/embeddings")
 @app.post("/api/embeddings/{url_idx}")
 async def generate_embeddings(
@@ -571,7 +630,7 @@ async def generate_embeddings(
 
     r = requests.request(
         method="POST",
-        url=f"{url}/api/embed",
+        url=f"{url}/api/embeddings",
         headers={"Content-Type": "application/json"},
         data=form_data.model_dump_json(exclude_none=True).encode(),
     )
@@ -730,6 +789,7 @@ async def generate_chat_completion(
 ):
     payload = {**form_data.model_dump(exclude_none=True)}
     log.debug(f"{payload = }")
+
     if "metadata" in payload:
         del payload["metadata"]
 
@@ -767,7 +827,10 @@ async def generate_chat_completion(
     log.debug(payload)
 
     return await post_streaming_url(
-        f"{url}/api/chat", json.dumps(payload), content_type="application/x-ndjson"
+        f"{url}/api/chat",
+        json.dumps(payload),
+        stream=form_data.stream,
+        content_type="application/x-ndjson",
     )
 
 

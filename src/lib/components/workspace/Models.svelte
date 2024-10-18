@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { marked } from 'marked';
+
 	import { toast } from 'svelte-sonner';
 	import Sortable from 'sortablejs';
 
@@ -92,6 +94,58 @@
 		};
 
 		window.addEventListener('message', messageHandler, false);
+	};
+
+	const moveToTopHandler = async (model) => {
+		// find models with position 0 and set them to 1
+		const topModels = _models.filter((m) => m.info?.meta?.position === 0);
+		for (const m of topModels) {
+			let info = m.info;
+			if (!info) {
+				info = {
+					id: m.id,
+					name: m.name,
+					meta: {
+						position: 1
+					},
+					params: {}
+				};
+			}
+
+			info.meta = {
+				...info.meta,
+				position: 1
+			};
+
+			await updateModelById(localStorage.token, info.id, info);
+		}
+
+		let info = model.info;
+
+		if (!info) {
+			info = {
+				id: model.id,
+				name: model.name,
+				meta: {
+					position: 0
+				},
+				params: {}
+			};
+		}
+
+		info.meta = {
+			...info.meta,
+			position: 0
+		};
+
+		const res = await updateModelById(localStorage.token, info.id, info);
+
+		if (res) {
+			toast.success($i18n.t(`Model {{name}} is now at the top`, { name: info.id }));
+		}
+
+		await models.set(await getModels(localStorage.token));
+		_models = $models;
 	};
 
 	const hideModelHandler = async (model) => {
@@ -240,7 +294,15 @@
 	}}
 />
 
-<div class=" text-lg font-semibold mb-3">{$i18n.t('Models')}</div>
+<div class="mb-3">
+	<div class="flex justify-between items-center">
+		<div class="flex md:self-center text-lg font-medium px-0.5">
+			{$i18n.t('Models')}
+			<div class="flex self-center w-[1px] h-6 mx-2.5 bg-gray-200 dark:bg-gray-700" />
+			<span class="text-lg font-medium text-gray-500 dark:text-gray-300">{$models.length}</span>
+		</div>
+	</div>
+</div>
 
 <div class=" flex w-full space-x-2">
 	<div class="flex flex-1">
@@ -283,9 +345,10 @@
 		</a>
 	</div>
 </div>
-<hr class=" dark:border-gray-850 my-2.5" />
 
-<a class=" flex space-x-4 cursor-pointer w-full mb-2 px-3 py-2" href="/workspace/models/create">
+<hr class=" border-gray-50 dark:border-gray-850 my-2.5" />
+
+<a class=" flex space-x-4 cursor-pointer w-full mb-2 px-3 py-1" href="/workspace/models/create">
 	<div class=" self-center w-10 flex-shrink-0">
 		<div
 			class="w-full h-10 flex justify-center rounded-full bg-transparent dark:bg-gray-700 border border-dashed border-gray-200"
@@ -306,7 +369,7 @@
 	</div>
 </a>
 
-<hr class=" dark:border-gray-850" />
+<hr class=" border-gray-50 dark:border-gray-850 my-2.5" />
 
 <div class=" my-2 mb-5" id="model-list">
 	{#each _models.filter((m) => searchValue === '' || m.name
@@ -322,7 +385,7 @@
 			>
 				<div class=" self-start w-8 pt-0.5">
 					<div
-						class=" rounded-full bg-stone-700 {(model?.info?.meta?.hidden ?? false)
+						class=" rounded-full object-cover {(model?.info?.meta?.hidden ?? false)
 							? 'brightness-90 dark:brightness-50'
 							: ''} "
 					>
@@ -337,9 +400,21 @@
 				<div
 					class=" flex-1 self-center {(model?.info?.meta?.hidden ?? false) ? 'text-gray-500' : ''}"
 				>
-					<div class="  font-semibold line-clamp-1">{model.name}</div>
-					<div class=" text-xs overflow-hidden text-ellipsis line-clamp-1">
-						{!!model?.info?.meta?.description ? model?.info?.meta?.description : model.id}
+					<Tooltip
+						content={marked.parse(
+							model?.ollama?.digest
+								? `${model?.ollama?.digest} *(${model?.ollama?.modified_at})*`
+								: ''
+						)}
+						className=" w-fit"
+						placement="top-start"
+					>
+						<div class="  font-semibold line-clamp-1">{model.name}</div>
+					</Tooltip>
+					<div class=" text-xs overflow-hidden text-ellipsis line-clamp-1 text-gray-500">
+						{!!model?.info?.meta?.description
+							? model?.info?.meta?.description
+							: (model?.ollama?.digest ?? model.id)}
 					</div>
 				</div>
 			</a>
@@ -439,6 +514,9 @@
 						}}
 						exportHandler={() => {
 							exportModelHandler(model);
+						}}
+						moveToTopHandler={() => {
+							moveToTopHandler(model);
 						}}
 						hideHandler={() => {
 							hideModelHandler(model);

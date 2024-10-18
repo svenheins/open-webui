@@ -1,6 +1,14 @@
 <script lang="ts">
 	import { prompts } from '$lib/stores';
-	import { findWordIndices } from '$lib/utils';
+	import {
+		findWordIndices,
+		getUserPosition,
+		getFormattedDate,
+		getFormattedTime,
+		getCurrentDateTime,
+		getUserTimezone,
+		getWeekday
+	} from '$lib/utils';
 	import { tick, getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
@@ -39,8 +47,6 @@
 				return '{{CLIPBOARD}}';
 			});
 
-			console.log(clipboardText);
-
 			const clipboardItems = await navigator.clipboard.read();
 
 			let imageUrl = null;
@@ -50,7 +56,6 @@
 					if (type.startsWith('image/')) {
 						const blob = await item.getType(type);
 						imageUrl = URL.createObjectURL(blob);
-						console.log(`Image URL (${type}): ${imageUrl}`);
 					}
 				}
 			}
@@ -65,7 +70,42 @@
 				];
 			}
 
-			text = command.content.replaceAll('{{CLIPBOARD}}', clipboardText);
+			text = text.replaceAll('{{CLIPBOARD}}', clipboardText);
+		}
+
+		if (command.content.includes('{{USER_LOCATION}}')) {
+			const location = await getUserPosition();
+			text = text.replaceAll('{{USER_LOCATION}}', String(location));
+		}
+
+		if (command.content.includes('{{USER_LANGUAGE}}')) {
+			const language = localStorage.getItem('locale') || 'en-US';
+			text = text.replaceAll('{{USER_LANGUAGE}}', language);
+		}
+
+		if (command.content.includes('{{CURRENT_DATE}}')) {
+			const date = getFormattedDate();
+			text = text.replaceAll('{{CURRENT_DATE}}', date);
+		}
+
+		if (command.content.includes('{{CURRENT_TIME}}')) {
+			const time = getFormattedTime();
+			text = text.replaceAll('{{CURRENT_TIME}}', time);
+		}
+
+		if (command.content.includes('{{CURRENT_DATETIME}}')) {
+			const dateTime = getCurrentDateTime();
+			text = text.replaceAll('{{CURRENT_DATETIME}}', dateTime);
+		}
+
+		if (command.content.includes('{{CURRENT_TIMEZONE}}')) {
+			const timezone = getUserTimezone();
+			text = text.replaceAll('{{CURRENT_TIMEZONE}}', timezone);
+		}
+
+		if (command.content.includes('{{CURRENT_WEEKDAY}}')) {
+			const weekday = getWeekday();
+			text = text.replaceAll('{{CURRENT_WEEKDAY}}', weekday);
 		}
 
 		prompt = text;
@@ -92,11 +132,11 @@
 {#if filteredPrompts.length > 0}
 	<div
 		id="commands-container"
-		class="pl-1 pr-12 mb-3 text-left w-full absolute bottom-0 left-0 right-0 z-10"
+		class="pl-2 pr-14 mb-3 text-left w-full absolute bottom-0 left-0 right-0 z-10"
 	>
 		<div class="flex w-full dark:border dark:border-gray-850 rounded-lg">
 			<div class="  bg-gray-50 dark:bg-gray-850 w-10 rounded-l-lg text-center">
-				<div class=" text-lg font-semibold mt-2">/</div>
+				<div class=" text-lg font-medium mt-2">/</div>
 			</div>
 
 			<div
